@@ -1,5 +1,7 @@
 # websocket-vue
 
+## 简易聊天室
+
 ## Project setup
 ```
 npm install
