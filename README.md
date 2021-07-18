@@ -1,5 +1,10 @@
 # websocket-vue
 
+## 简易聊天室
+```
+地址:192.168.1.6   端口:8888
+```
+
 ## Project setup
 ```
 npm install
@@ -7,7 +12,7 @@ npm install
 
 ### Compiles and hot-reloads for development
 ```
-npm run serve
+npm run dev
 ```
 
 ### Compiles and minifies for production
