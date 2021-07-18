@@ -8,26 +8,35 @@
     &nbsp;
     <button @click="confirmSend">发送</button>
     <br />
+    <button @click="theEnd">结束</button>
+    &nbsp;
+    <button @click="theStart">重连</button>
+    <span>在线人数 {{ onlineUsers }}</span>
     <br />
     <div class="msg-content">
       <div v-for="(item, index) in msgList" :key="index">
-        <div v-if="item.username === username" class="msg-right">
-          <div>
-            <div class="my-msg pseudo-right">{{ item.msg }}</div>
-            <div v-show="showTime" class="my-time">{{ item.time }}</div>
-          </div>
-          <div class="user-img">
-            <img src="../assets/images/userimg.jpg" alt="" />
-          </div>
+        <div v-if="item.login || item.exit" class="message-box">
+          <span>{{ item.login ? '登录:' : '退出:' }} {{ item.username }}</span>
         </div>
-        <div v-else class="msg-left">
-          <div class="user-img user-img-left">
-            <img src="../assets/images/userimg.jpg" alt="" />
+        <div v-else>
+          <div v-if="item.username === username" class="msg-right">
+            <div>
+              <div class="my-msg pseudo-right">{{ item.msg }}</div>
+              <div v-show="showTime" class="my-time">{{ item.time }}</div>
+            </div>
+            <div class="user-img">
+              <img src="../assets/images/userimg.jpg" alt="" />
+            </div>
           </div>
-          <div>
-            <div class="other-name">{{ item.username }}</div>
-            <div class="my-msg other-msg">{{ item.msg }}</div>
-            <div v-show="showTime" class="my-time other-time">{{ item.time }}</div>
+          <div v-if="item.username !== username" class="msg-left">
+            <div class="user-img user-img-left">
+              <img src="../assets/images/userimg.jpg" alt="" />
+            </div>
+            <div>
+              <div class="other-name">{{ item.username }}</div>
+              <div class="my-msg other-msg">{{ item.msg }}</div>
+              <div v-show="showTime" class="my-time other-time">{{ item.time }}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -36,27 +45,33 @@
 </template>
 
 <script>
+import { dateFormat } from '../util/dateFormat'
+
 // @ is an alias to /src
-const ws = new WebSocket('ws://192.168.1.6:8888')
+// const ws = new WebSocket('ws://192.168.1.6:8888')
 
 export default {
   name: 'Home',
   data() {
     return {
       username: '',
+      message: 'hello rookie',
       disabled: false,
-      message: '',
+      showTime: true,
+      close: true,
       msgList: [],
-      showTime: true
+      onlineUsers: '正在查找',
     }
   },
-  components: {},
-  mounted() {
-    ws.addEventListener('open', this.onOpen.bind(this), false)
-    ws.addEventListener('close', this.onClose.bind(this), false)
-    ws.addEventListener('error', this.onError.bind(this), false)
-    ws.addEventListener('message', this.onMessage.bind(this), false)
+  created() {
+    this.username = 'ID-' + (Math.random() * 10).toFixed(1)
+    this.initWebSocket()
   },
+  destroyed() {
+    this.close = false
+    this.websock.close()
+  },
+  mounted() {},
   methods: {
     confirmSend() {
       if (!this.username) {
@@ -64,67 +79,107 @@ export default {
         return
       }
       if (!this.message.trim()) return
-      ws.send(
+      this.websocketSend(
         JSON.stringify({
           msg: this.message,
           time: new Date().getTime(),
-          username: this.username
+          username: this.username,
+          connect: 1
         })
       )
       console.log('发送完毕')
       this.disabled = true
       this.message = ''
     },
-    onOpen(e) {
-      console.log('onOpen', e)
+    theEnd() {
+      this.close = false
+      this.websock.close()
+      this.onlineUsers = '已退出'
     },
-    onClose(e) {
-      console.log('onClose', e)
+    theStart() {
+      this.close = true
+      this.websock.close()
+      this.onlineUsers = '重连中'
+      this.reconnect()
     },
-    onError(e) {
-      console.log('onError', e)
+    initWebSocket: function () {
+      // WebSocket与普通的请求所用协议有所不同，ws等同于http，wss等同于https
+      console.log('调用了链接websock')
+      let userId = this.username
+      // var url = window._CONFIG['domianURL'].replace('https://', 'wss://').replace('http://', 'ws://') + '/websocket/' + userId
+      const url = 'ws://192.168.1.3:8888/websocket/' + userId
+      console.log(url)
+      this.websock = new WebSocket(url)
+      this.websock.onopen = this.websocketOnopen
+      this.websock.onerror = this.websocketOnerror
+      this.websock.onmessage = this.websocketOnmessage
+      this.websock.onclose = this.websocketOnclose
     },
-    onMessage(e) {
-      console.log('onMessage<收到数据>')
+    websocketOnopen: function () {
+      console.log('WebSocket连接成功')
+      //心跳检测重置
+      //this.heartCheck.reset().start();
+
+      // 连接成功后发送用户名给服务器
+      this.websocketSend(
+        JSON.stringify({
+          login: 1,
+          username: this.username
+        })
+      )
+    },
+    websocketOnerror: function (e) {
+      console.log('WebSocket连接发生错误')
+      this.reconnect()
+    },
+    websocketOnmessage: function (e) {
+      // console.log(e.data)
+      console.log('-----接收消息-------')
+      // const data = eval('(' + e.data + ')') //解析对象
       const data = JSON.parse(e.data)
       console.log(data)
-      data.time = this.dateFormat(data.time, 'H:I:S')
-      this.msgList.push(data)
-    },
-    // 转化时间戳
-    /**
-     * 日期格式化
-     * @param Number time 时间戳
-     * @param String format 格式  'Y-M-D H:I:S'
-     */
-    dateFormat(time, format) {
-      const t = new Date(time)
-      // 日期格式
-      format = format || 'Y-m-d h:i:s'
-      let year = t.getFullYear()
-      // 由于 getMonth 返回值会比正常月份小 1
-      let month = t.getMonth() + 1
-      let day = t.getDate()
-      let hours = t.getHours()
-      let minutes = t.getMinutes()
-      let seconds = t.getSeconds()
 
-      const hash = {
-        y: year,
-        m: month,
-        d: day,
-        h: hours,
-        i: minutes,
-        s: seconds
+      // 判断有该属性时赋值并渲染对话列表
+      if (data.hasOwnProperty('connect')) {
+        data.time = dateFormat(data.time, 'H:I:S')
+        this.msgList.push(data)
       }
-      // 是否补 0
-      const isAddZero = (o) => {
-        return /M|D|H|I|S/.test(o)
+      // 登录广播回来的数据
+      if (data.hasOwnProperty('login')) {
+        this.msgList.push(data)
       }
-      return format.replace(/\w/g, (o) => {
-        let rt = hash[o.toLocaleLowerCase()]
-        return rt > 10 || !isAddZero(o) ? rt : `0${rt}`
-      })
+      // 退出广播返回的数据
+      if (data.hasOwnProperty('exit')) {
+        this.msgList.push(data)
+        console.log(data);
+      }
+
+      this.onlineUsers = data.onlineUsers // 每次交互刷新在线人数
+    },
+    websocketOnclose: function (e) {
+      console.log('连接关闭 (' + e.code + ')')
+      console.log(this.close)
+      if (!this.close) return
+      this.reconnect()
+    },
+    websocketSend(text) {
+      // 数据发送
+      try {
+        this.websock.send(text)
+      } catch (err) {
+        console.log('send failed (' + err.code + ')')
+      }
+    },
+
+    reconnect() {
+      if (this.lockReconnect) return
+      this.lockReconnect = true
+      //没连接上会一直重连，设置延迟避免请求过多
+      setTimeout(() => {
+        console.info('尝试重连...')
+        this.initWebSocket()
+        this.lockReconnect = false
+      }, 5000)
     }
   }
 }
@@ -208,5 +263,20 @@ export default {
   left: -2px;
   top: 8px;
   transform: rotate(45deg);
+}
+/* 进入离开信息 */
+.message-box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.message-box span {
+  text-align: center;
+  padding: 4px;
+  background-color: #e8e8e8;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #797979;
+  margin-bottom:4px;
 }
 </style>
