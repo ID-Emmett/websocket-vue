@@ -87,7 +87,6 @@ export default {
           connect: 1
         })
       )
-      console.log('发送完毕')
       this.disabled = true
       this.message = ''
     },
@@ -107,7 +106,8 @@ export default {
       console.log('调用了链接websock')
       let userId = this.username
       // var url = window._CONFIG['domianURL'].replace('https://', 'wss://').replace('http://', 'ws://') + '/websocket/' + userId
-      const url = 'ws://192.168.1.3:8888/websocket/' + userId
+      // const url = 'ws://192.168.1.3:8888/websocket/' + userId
+      const url = 'ws://localhost:8888/websocket/' + userId
       console.log(url)
       this.websock = new WebSocket(url)
       this.websock.onopen = this.websocketOnopen
@@ -141,7 +141,7 @@ export default {
 
       // 判断有该属性时赋值并渲染对话列表
       if (data.hasOwnProperty('connect')) {
-        data.time = dateFormat(data.time, 'H:I:S')
+        data.time = dateFormat(data.time, 'H:I')
         this.msgList.push(data)
       }
       // 登录广播回来的数据
@@ -165,7 +165,31 @@ export default {
     websocketSend(text) {
       // 数据发送
       try {
-        this.websock.send(text)
+        // if (this.websock.readyState !== WebSocket.OPEN) return
+        // this.websock.send(text)
+        switch (this.websock.readyState) {
+          case WebSocket.OPEN:
+            this.websock.send(text)
+            break;
+        
+          case WebSocket.CONNECTING:
+            console.log('正在连接中，对应的值为 0');
+            break;
+        
+          case WebSocket.CLOSING:
+            console.log('连接正在关闭，对应的值为 2');
+            break;
+           
+          case WebSocket.CLOSED:
+            console.log('连接已关闭或者没有连接成功，对应的值为 3');
+            break;
+        
+          default:
+            console.log('未知状态',this.websock.readyState);
+            break;
+        }
+
+
       } catch (err) {
         console.log('send failed (' + err.code + ')')
       }
@@ -174,12 +198,12 @@ export default {
     reconnect() {
       if (this.lockReconnect) return
       this.lockReconnect = true
-      //没连接上会一直重连，设置延迟避免请求过多
+      // 没连接上会一直重连，设置延迟避免请求过多
       setTimeout(() => {
         console.info('尝试重连...')
         this.initWebSocket()
         this.lockReconnect = false
-      }, 5000)
+      }, 2000)
     }
   }
 }
