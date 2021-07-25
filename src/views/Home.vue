@@ -1,6 +1,15 @@
 <template>
   <div class="home">
-    显示时间<input type="checkbox" v-model="showTime" />
+    <div class="content" @click="tigger">
+      <div id="z">Z轴方向(α)：{{ alpha }}</div>
+      <div id="x">X轴翻转(β)：{{ beta }}</div>
+      <div id="y">Y轴翻转(γ)：{{ gamma }}</div>
+      <div class="txt">
+        <h1 id="v">Hello</h1>
+      </div>
+    </div>
+
+    <!-- 显示时间<input type="checkbox" v-model="showTime" />
     &nbsp;
     <input type="text" placeholder="输入昵称" v-model="username" :disabled="disabled" style="width: 100px" />
     &nbsp;
@@ -40,7 +49,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </div> -->
   </div>
 </template>
 
@@ -61,18 +70,74 @@ export default {
       close: true,
       msgList: [],
       onlineUsers: '正在查找',
+      alpha: null,
+      gamma: null,
+      beta: null
     }
   },
   created() {
     this.username = 'ID-' + (Math.random() * 10).toFixed(1)
-    this.initWebSocket()
+    // this.initWebSocket()
   },
   destroyed() {
     this.close = false
-    this.websock.close()
+    if (this.websock) {
+      this.websock.close()
+    }
   },
-  mounted() {},
+  mounted() {
+    let v = document.getElementById('v')
+    console.log(v)
+    v.style.transform = 'translate3d(9px,4px,70px)'
+    // x.style.transform = 'rotateX(50deg)'
+  },
   methods: {
+    // 授权
+    tigger() {
+      if (!window.DeviceOrientationEvent.requestPermission) return
+      window.DeviceMotionEvent.requestPermission()
+        .then((state) => {
+          if ('granted' === state) {
+            this.device()
+          } else {
+            alert('apply permission state: ' + state)
+          }
+        })
+        .catch(function (err) {
+          alert('error: ' + err)
+        })
+    },
+    device() {
+      let v = document.getElementById('v')
+
+      if (window.DeviceOrientationEvent) {
+        window.addEventListener(
+          'deviceorientation',
+          ({ alpha, gamma, beta }) => {
+            alpha = (alpha * 1).toFixed(1)
+            gamma = (gamma* 1).toFixed(1)
+            beta = (beta * 1).toFixed(1)
+            
+            // 水平 垂直 范围
+            // v.style.textShadow = `${gamma}px ${beta}px 20px #ff0000`
+            v.style.textShadow = `${gamma}px ${beta}px 0 #CCC,
+            ${gamma+1}px ${beta+1}px 0 #CCC,
+            ${gamma+2}px ${beta+2}px 0 #2C3E50,
+            ${gamma+3}px ${beta+3}px 0 #2C3E50,
+            ${gamma+4}px ${beta+4}px 0 #2C3E50,
+            ${gamma+5}px ${beta+5}px 0 #2C3E50`
+            // console.log(e)
+            this.handleOrientationEvent(alpha, gamma, beta)
+          },
+          true
+        )
+      }
+    },
+    handleOrientationEvent(f, l, r) {
+      this.alpha = f
+      this.gamma = l
+      this.beta = r
+    },
     confirmSend() {
       if (!this.username) {
         alert('昵称未定义')
@@ -107,7 +172,7 @@ export default {
       let userId = this.username
       // var url = window._CONFIG['domianURL'].replace('https://', 'wss://').replace('http://', 'ws://') + '/websocket/' + userId
       // const url = 'ws://192.168.1.3:8888/websocket/' + userId
-      const url = 'ws://localhost:8888/websocket/' + userId
+      const url = 'wss://192.168.1.6:8888/websocket/' + userId
       console.log(url)
       this.websock = new WebSocket(url)
       this.websock.onopen = this.websocketOnopen
@@ -151,7 +216,7 @@ export default {
       // 退出广播返回的数据
       if (data.hasOwnProperty('exit')) {
         this.msgList.push(data)
-        console.log(data);
+        console.log(data)
       }
 
       this.onlineUsers = data.onlineUsers // 每次交互刷新在线人数
@@ -170,26 +235,24 @@ export default {
         switch (this.websock.readyState) {
           case WebSocket.OPEN:
             this.websock.send(text)
-            break;
-        
+            break
+
           case WebSocket.CONNECTING:
-            console.log('正在连接中，对应的值为 0');
-            break;
-        
+            console.log('正在连接中，对应的值为 0')
+            break
+
           case WebSocket.CLOSING:
-            console.log('连接正在关闭，对应的值为 2');
-            break;
-           
+            console.log('连接正在关闭，对应的值为 2')
+            break
+
           case WebSocket.CLOSED:
-            console.log('连接已关闭或者没有连接成功，对应的值为 3');
-            break;
-        
+            console.log('连接已关闭或者没有连接成功，对应的值为 3')
+            break
+
           default:
-            console.log('未知状态',this.websock.readyState);
-            break;
+            console.log('未知状态', this.websock.readyState)
+            break
         }
-
-
       } catch (err) {
         console.log('send failed (' + err.code + ')')
       }
@@ -301,6 +364,40 @@ export default {
   border-radius: 4px;
   font-size: 12px;
   color: #797979;
-  margin-bottom:4px;
+  margin-bottom: 4px;
+}
+.content {
+  background: pink;
+  height: 100vh;
+  width: 100vw;
+}
+.txt {
+  width: 100%;
+  height: 500px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: Helvetica, sans-serif;
+  font-size: 70px;
+  color: #2C3E50;
+}
+#v {
+  /* 水平 垂直 范围 */
+  /* text-shadow: 5px 20px 20px #ff0000; */
+  text-shadow: 1px 1px 0 #CCC,
+  2px 2px 0 #CCC, /* end of 2 level deep grey shadow */
+  3px 3px 0 #2C3E50,
+  4px 4px 0 #2C3E50,
+  5px 5px 0 #2C3E50,
+  6px 6px 0 #2C3E50; /* end of 4 level deep dark shadow */;
+
+  text-shadow: -1px -1px 0 #CCC,
+  -2px -2px 0 #CCC,
+  -3px -3px 0 #2C3E50,
+  -4px -4px 0 #2C3E50,
+  -5px -5px 0 #2C3E50,
+  -6px -6px 0 #2C3E50;
+
+
 }
 </style>
